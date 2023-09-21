@@ -44,6 +44,8 @@ const (
 	WorkerQueueBindingType WorkerBindingType = "queue"
 	// DispatchNamespaceBindingType is the type for WFP namespace bindings.
 	DispatchNamespaceBindingType WorkerBindingType = "dispatch_namespace"
+	// WorkerD1BindingType is the type for D1 database bindings.
+	WorkerD1BindingType WorkerBindingType = "d1"
 )
 
 type ListWorkerBindingsParams struct {
@@ -408,6 +410,36 @@ func (b DispatchNamespaceBinding) serialize(bindingName string) (workerBindingMe
 	return meta, nil, nil
 }
 
+// WorkerD1Binding is a binding to a D1 database.
+//
+// https://developers.cloudflare.com/workers/configuration/bindings/#d1-database-bindings
+type WorkerD1Binding struct {
+	Binding    string
+	DatabaseId string
+}
+
+// Type returns the type of the binding.
+func (b WorkerD1Binding) Type() WorkerBindingType {
+	return WorkerD1BindingType
+}
+
+func (b WorkerD1Binding) serialize(bindingName string) (workerBindingMeta, workerBindingBodyWriter, error) {
+	if b.Binding == "" {
+		return nil, nil, fmt.Errorf(`Binding name for binding "%s" cannot be empty`, bindingName)
+	}
+
+	if b.DatabaseId == "" {
+		return nil, nil, fmt.Errorf(`DatabaseId name for binding "%s" cannot be empty`, bindingName)
+	}
+
+	return workerBindingMeta{
+		"type":        b.Type(),
+		"name":        b.Binding,
+		"id":          b.DatabaseId,
+		"database_id": b.DatabaseId,
+	}, nil, nil
+}
+
 // UnsafeBinding is for experimental or deprecated bindings, and allows specifying any binding type or property.
 type UnsafeBinding map[string]interface{}
 
@@ -528,6 +560,12 @@ func (api *API) ListWorkerBindings(ctx context.Context, rc *ResourceContainer, p
 			dataset := jsonBinding["dataset"].(string)
 			bindingListItem.Binding = WorkerAnalyticsEngineBinding{
 				Dataset: dataset,
+			}
+		case WorkerD1BindingType:
+			databaseId := jsonBinding["database_id"].(string)
+			bindingListItem.Binding = WorkerD1Binding{
+				Binding:    name,
+				DatabaseId: databaseId,
 			}
 		default:
 			bindingListItem.Binding = WorkerInheritBinding{}
